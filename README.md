@@ -58,11 +58,11 @@ The [Releases](https://github.com/unpins/opus-tools/releases) page has standalon
 
 ## Build notes
 
-- One multicall binary holds all three tools. `opusenc` is the canonical name (a
-  busybox-style dispatcher); `opusdec` and `opusinfo` dispatch on `argv[0]`. The
-  tools share the heavy static archives — libopusenc / libopus / libFLAC /
-  libogg, plus opusfile + opusurl (URL decode) — linked once, so the binary
-  carries a single copy of each codec library.
+- One multicall binary holds all three tools. `opus-tools` is the canonical name
+  (a busybox-style dispatcher); `opusenc`, `opusdec` and `opusinfo` dispatch on
+  `argv[0]`. The tools share the heavy static archives — libopusenc / libopus /
+  libFLAC / libogg, plus opusfile + opusurl (URL decode) — linked once, so the
+  binary carries a single copy of each codec library.
 - opus-tools is autotools and sets per-tool CFLAGS, so each shared source is
   compiled once per tool. The tools are folded together post-link by renaming
   each tool's `main` → `<tool>_main` (and prefixing its other globals) with

@@ -1,10 +1,11 @@
 # opus-tools ships three command-line tools — `opusenc` (encode), `opusdec`
 # (decode/play) and `opusinfo` (inspect Opus streams). To honour the unpins
 # one-pkg-one-bin rule we post-link them into a single multicall binary at
-# $out/bin/opusenc (a busybox-style dispatcher named after the flagship tool, as
-# the unpins CI resolves result/bin/<binName>); `lib.withAliases` then embeds
-# `opusdec` and `opusinfo` as UNPIN_META aliases so unpin's installer recreates
-# the argv[0] shims.
+# $out/bin/opus-tools (a busybox-style dispatcher named after the package, since
+# unpins/action-build resolves result/bin/<package_name>); `lib.withAliases`
+# then embeds `opusenc`, `opusdec` and `opusinfo` as UNPIN_META aliases so
+# unpin's installer recreates the argv[0] shims. The bare `opus-tools` name
+# isn't a real tool, so it falls through to the flagship encoder (opusenc).
 #
 # Why a post-link route (no source patch): the three tools are separate automake
 # programs that share the heavy static archives — libopusenc / libopus / libFLAC
@@ -172,11 +173,11 @@ let
         done
       done
 
-      # Dispatcher: basename(argv[0]) → <tool>_main. The canonical name (opusenc)
-      # and any unknown argv[0] fall through to a `<bin> <applet> …` form and
-      # finally to opusenc_main, so the bare dispatcher stays callable (its
-      # `--version` smoke reaches opusenc_main) and survives a rename (CI smoke
-      # copies it to smoke.exe).
+      # Dispatcher: basename(argv[0]) → <tool>_main. The canonical name
+      # (opus-tools) and any unknown argv[0] fall through to a `<bin> <applet> …`
+      # form and finally to opusenc_main, so the bare dispatcher stays callable
+      # (its `--version` smoke reaches opusenc_main and prints "opusenc
+      # opus-tools …") and survives a rename (CI smoke copies it to smoke.exe).
       {
         echo '#include <string.h>'
         for t in $TOOLS; do echo "int ''${t}_main(int, char **);"; done
@@ -238,12 +239,14 @@ CBODY
     installPhase = ''
       runHook preInstall
       mkdir -p "$out/bin" "$out/share/man/man1"
-      # Canonical binary is named after the flagship tool (opusenc) — a
-      # busybox-style dispatcher; opusdec/opusinfo are symlinks that
+      # Canonical binary is named after the package (opus-tools) — a
+      # busybox-style dispatcher that action-build resolves as
+      # result/bin/<package_name>; opusenc/opusdec/opusinfo are symlinks that
       # lib.withAliases turns into argv[0] aliases.
-      install -m755 mc/opusenc "$out/bin/opusenc"
-      ln -s opusenc "$out/bin/opusdec"
-      ln -s opusenc "$out/bin/opusinfo"
+      install -m755 mc/opusenc "$out/bin/opus-tools"
+      ln -s opus-tools "$out/bin/opusenc"
+      ln -s opus-tools "$out/bin/opusdec"
+      ln -s opus-tools "$out/bin/opusinfo"
 
       # Man pages ship as source (man/<tool>.1); install all three so the set
       # matches nixpkgs' opus-tools man output (no winManRoot needed).
@@ -260,7 +263,7 @@ CBODY
 
   aliased = lib.withAliases pkgs
     {
-      primary = "opusenc";
+      primary = "opus-tools";
       aliasesFromSymlinksIn = "bin";
     }
     multicall;
@@ -268,7 +271,7 @@ in
 if isWindows
 then aliased.overrideAttrs (o: {
   postFixup = (o.postFixup or "") + ''
-    [ -f "$out/bin/opusenc" ] && mv "$out/bin/opusenc" "$out/bin/opusenc.exe"
+    [ -f "$out/bin/opus-tools" ] && mv "$out/bin/opus-tools" "$out/bin/opus-tools.exe"
   '';
 })
 else aliased

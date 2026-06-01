@@ -10,10 +10,10 @@
 
   # opus-tools installs three CLIs — `opusenc` (encode WAV/FLAC/AIFF → Opus),
   # `opusdec` (decode/play Opus) and `opusinfo` (inspect Opus streams);
-  # ./multicall.nix post-links them into one `opusenc` dispatcher binary with
-  # `opusdec`/`opusinfo` as argv[0]-dispatch UNPIN_META aliases. Unlike the
-  # CMake suites (flac/libwebp), opus-tools is autotools and its three programs
-  # share most of their objects (opus_header / diag_range / picture /
+  # ./multicall.nix post-links them into one `opus-tools` dispatcher binary with
+  # `opusenc`/`opusdec`/`opusinfo` as argv[0]-dispatch UNPIN_META aliases. Unlike
+  # the CMake suites (flac/libwebp), opus-tools is autotools and its three
+  # programs share most of their objects (opus_header / diag_range / picture /
   # unicode_support), so the per-tool link command is captured from a verbose
   # relink (the autotools analog of CMake's link.txt) and only the colliding
   # `main`s are renamed.
@@ -22,11 +22,14 @@
   # opusfile) cross-compile cleanly and the runtime is folded static in the
   # multicall link so the .exe carries no companion DLLs.
   #
-  # The canonical binary is named `opusenc` (the flagship tool); the unpins CI
-  # portability/smoke checks resolve result/bin/<name>, but the package is
-  # `opus-tools`, so binName pins the dispatcher to opusenc while keeping the
-  # repo/flake name. All three upstream man pages ship, matching nixpkgs'
-  # opus-tools man output, so no winManRoot curation is needed.
+  # The canonical binary is named `opus-tools` (the package name), matching the
+  # unpins/action-build contract that result/bin/<package_name> is the binary it
+  # portability/smoke-checks — so binName is left at its default (= name) and the
+  # real tool names (opusenc/opusdec/opusinfo) are the aliases. The bare
+  # `opus-tools` dispatcher falls through to the flagship encoder, so
+  # `opus-tools --version` prints opusenc's banner (matching smokePattern). All
+  # three upstream man pages ship, matching nixpkgs' opus-tools man output, so no
+  # winManRoot curation is needed.
   outputs = { self, unpins-lib }:
     let
       ulib = unpins-lib.lib;
@@ -34,7 +37,6 @@
     ulib.mkStandaloneFlake {
       inherit self;
       name = "opus-tools";
-      binName = "opusenc";
       smoke = [ "--version" ];
       smokePattern = "opusenc.*opus-tools";
       build = pkgs:
