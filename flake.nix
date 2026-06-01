@@ -39,9 +39,25 @@
       name = "opus-tools";
       smoke = [ "--version" ];
       smokePattern = "opusenc.*opus-tools";
+      # On native aarch64-darwin, nixpkgs writes meson's `cpu_family = arm64`
+      # (transitional uname), which libopus' meson.build doesn't canonicalize to
+      # `aarch64`, so its NEON intrinsics branch is skipped and the build errors
+      # ("no intrinsics support for arm64"). nix-lib carries the one-line source
+      # fix as `nativeFixes.libopus`; opus-tools doesn't depend on libopus
+      # directly — it comes via libopusenc + opusfile — so inject the patched
+      # libopus into both. The patch is an inert extra match-list entry on every
+      # other platform, so it's applied unconditionally.
       build = pkgs:
+        let
+          ps = pkgs.pkgsStatic;
+          fixedOpus = ulib.nativeFixes.libopus ps;
+          opusTools = ps.opus-tools.override {
+            libopusenc = ps.libopusenc.override { libopus = fixedOpus; };
+            opusfile = ps.opusfile.override { libopus = fixedOpus; };
+          };
+        in
         import ./multicall.nix { lib = pkgs.lib // ulib; }
-          { inherit pkgs; opusTools = pkgs.pkgsStatic.opus-tools; };
+          { inherit pkgs opusTools; };
       windowsBuild = pkgs:
         import ./multicall.nix { lib = pkgs.lib // ulib; }
           { inherit pkgs; opusTools = (ulib.mingwStaticCross pkgs).opus-tools; };
