@@ -10,19 +10,6 @@ utilities — encode, decode and inspect [Opus](https://opus-codec.org/) audio.
 
 Part of the [unpins](https://unpins.org) project — native single-binary builds with no third-party runtime dependencies.
 
-## Tools
-
-One binary provides all three opus-tools CLIs:
-
-| command    | what it does                                          |
-| ---------- | ----------------------------------------------------- |
-| `opusenc`  | encode WAV / FLAC / AIFF / raw PCM to Opus            |
-| `opusdec`  | decode (or play) Opus back to WAV / raw PCM           |
-| `opusinfo` | show stream, header and tag info for an Opus file     |
-
-`opusenc` reads FLAC and Ogg FLAC input, and `opusdec` can decode Opus from a
-local file or an `http(s)://` URL.
-
 ## Usage
 
 Run a program with [unpin](https://github.com/unpins/unpin):
@@ -39,6 +26,19 @@ unpin install opus-tools
 ```
 
 `unpin install opus-tools` creates the `opusenc`, `opusdec`, and `opusinfo` commands.
+
+## Programs
+
+One binary provides all three opus-tools CLIs:
+
+| command    | what it does                                          |
+| ---------- | ----------------------------------------------------- |
+| `opusenc`  | encode WAV / FLAC / AIFF / raw PCM to Opus            |
+| `opusdec`  | decode (or play) Opus back to WAV / raw PCM           |
+| `opusinfo` | show stream, header and tag info for an Opus file     |
+
+`opusenc` reads FLAC and Ogg FLAC input, and `opusdec` can decode Opus from a
+local file or an `http(s)://` URL.
 
 ## Build locally
 
