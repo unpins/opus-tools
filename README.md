@@ -23,19 +23,22 @@ One binary provides all three opus-tools CLIs:
 `opusenc` reads FLAC and Ogg FLAC input, and `opusdec` can decode Opus from a
 local file or an `http(s)://` URL.
 
-## Installation
+## Usage
 
-Install with [unpin](https://github.com/unpins/unpin):
-
-```bash
-unpin opus-tools
-```
-
-Or run without installing:
+Run a program with [unpin](https://github.com/unpins/unpin):
 
 ```bash
-unpin run opus-tools -- opusenc song.wav song.opus
+unpin opus-tools opusenc song.wav song.opus
+unpin opus-tools opusdec song.opus song.wav
 ```
+
+To install the programs onto your PATH:
+
+```bash
+unpin install opus-tools
+```
+
+`unpin install opus-tools` creates the `opusenc`, `opusdec`, and `opusinfo` commands.
 
 ## Build locally
 
