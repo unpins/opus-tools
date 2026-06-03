@@ -1,7 +1,7 @@
 # opus-tools
 
 Standalone build of the [opus-tools](https://www.opus-codec.org/) command-line
-utilities — encode, decode and inspect [Opus](https://opus-codec.org/) audio.
+programs — encode, decode and inspect [Opus](https://opus-codec.org/) audio.
 
 [![CI](https://github.com/unpins/opus-tools/actions/workflows/opus-tools.yml/badge.svg)](https://github.com/unpins/opus-tools/actions)
 ![Linux](https://img.shields.io/badge/Linux-✓-success?logo=linux&logoColor=white)
@@ -28,8 +28,6 @@ unpin install opus-tools
 `unpin install opus-tools` creates the `opusenc`, `opusdec`, and `opusinfo` commands.
 
 ## Programs
-
-One binary provides all three opus-tools CLIs:
 
 | command    | what it does                                          |
 | ---------- | ----------------------------------------------------- |
