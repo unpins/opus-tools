@@ -64,12 +64,10 @@ The [Releases](https://github.com/unpins/opus-tools/releases) page has standalon
   `argv[0]`. The tools share the heavy static archives — libopusenc / libopus /
   libFLAC / libogg, plus opusfile + opusurl (URL decode) — linked once, so the
   binary carries a single copy of each codec library.
-- opus-tools is autotools and sets per-tool CFLAGS, so each shared source is
-  compiled once per tool. The tools are folded together post-link by renaming
-  each tool's `main` → `<tool>_main` (and prefixing its other globals) with
-  `objcopy`, then linking the renamed objects against the shared archives; the
-  exact archive list is read from each tool's real link command, captured with a
-  verbose relink.
+- The tools are folded together post-link by renaming each tool's `main` →
+  `<tool>_main` (and prefixing its other globals) with `objcopy`, then linking
+  the renamed objects against the shared archives; the archive list is read from
+  each tool's real link command, captured with a verbose relink.
 - **Windows** is built with mingw; the runtime is folded static in the multicall
   link, so the `.exe` has no companion DLLs.
 - All three upstream man pages (`opusenc.1`, `opusdec.1`, `opusinfo.1`) are
