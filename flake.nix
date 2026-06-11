@@ -1,5 +1,5 @@
 {
-  description = "Standalone build of the opus-tools (Opus audio encoder/decoder/info)";
+  description = "opus-tools (Opus audio encoder/decoder/info) as a single self-contained binary";
 
   nixConfig = {
     extra-substituters = [ "https://unpins.cachix.org" ];
