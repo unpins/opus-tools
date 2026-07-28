@@ -39,6 +39,22 @@
       name = "opus-tools";
       smoke = [ "--version" ];
       smokePattern = "opusenc.*opus-tools";
+
+      # Build via the unpin-llvm engine + emit a bitcode multicall module. On
+      # Linux the engine compiles opus-tools to bitcode and the standalone
+      # self-folds opusenc/opusdec/opusinfo into one `opus-tools` binary; darwin
+      # (no engine) keeps the objcopy fold in ./multicall.nix; windows via
+      # windowsBuild. Pure C — no requires.cxx. The bare `opus-tools --version`
+      # smoke falls through to opusenc, so defaultProgram pins it.
+      engine = "unpin-llvm";
+      multicall = {
+        defaultProgram = "opusenc";
+        programs = [
+          { name = "opusenc"; }
+          { name = "opusdec"; }
+          { name = "opusinfo"; }
+        ];
+      };
       # On native aarch64-darwin, nixpkgs writes meson's `cpu_family = arm64`
       # (transitional uname), which libopus' meson.build doesn't canonicalize to
       # `aarch64`, so its NEON intrinsics branch is skipped and the build errors
@@ -51,12 +67,30 @@
         let
           ps = pkgs.pkgsStatic;
           fixedOpus = ulib.nativeFixes.libopus ps;
+          # `.override` swaps only the named deps; opus-tools keeps the stdenv it
+          # already carries — on Linux that's the engine stdenv (enginePkgs swaps
+          # pkgsStatic.opus-tools), so the link-capture sidecars still get written.
           opusTools = ps.opus-tools.override {
             libopusenc = ps.libopusenc.override { libopus = fixedOpus; };
             opusfile = ps.opusfile.override { libopus = fixedOpus; };
           };
         in
-        import ./multicall.nix { lib = pkgs.lib // ulib; }
+        if pkgs.stdenv.hostPlatform.isLinux
+        # engine path: apps → bitcode → selfFold. opus-tools' configure runs
+        # AC_CHECK_PROG(pkg-config) for the *unprefixed* name; under the static
+        # stdenv the wrapper is host-prefixed, so HAVE_PKG_CONFIG=no and the FLAC
+        # probe falls back to a bare `-lFLAC` test that can't resolve libogg
+        # statically ("FLAC 1.1.3 required"). Force the flag so every
+        # PKG_CHECK_MODULES takes the pkg-config path. (multicall.nix does the
+        # same on the darwin/windows fold paths.)
+        then opusTools.overrideAttrs (o: {
+          preConfigure = (o.preConfigure or "") + ''
+            export HAVE_PKG_CONFIG=yes
+          '';
+          doCheck = false;
+          doInstallCheck = false;
+        })
+        else import ./multicall.nix { lib = pkgs.lib // ulib; }
           { inherit pkgs opusTools; };
       windowsBuild = pkgs:
         import ./multicall.nix { lib = pkgs.lib // ulib; }
