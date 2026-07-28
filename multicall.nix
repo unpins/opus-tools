@@ -185,7 +185,10 @@ let
         [ -n "$a" ] || continue
         printf '%s\t%s\n' "$a" "$(printf '%s' "$a" | tr -c 'A-Za-z0-9_' '_')"
       done < multicall/apps.list > multicall/applets.list
-${lib.multicallTableDispatcherC { name = "opus-tools"; defaultApplet = "opusenc"; }}
+      # `windows`: opusenc/opusdec/opusinfo all open with
+      # init_commandline_arguments_utf8(), which rebuilds argv from the real
+      # command line — without the rewrite they re-read the selector.
+${lib.multicallTableDispatcherC { name = "opus-tools"; defaultApplet = "opusenc"; windows = isWindows; }}
       $CC -O2 -c -o multicall/dispatcher.o multicall/dispatcher.c
 
       # Final link: shared archives, once. On GNU-ld targets wrap them in a group
