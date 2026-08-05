@@ -25,9 +25,7 @@
   # The canonical binary is named `opus-tools` (the package name), matching the
   # unpins/action-build contract that result/bin/<package_name> is the binary it
   # portability/smoke-checks — so binName is left at its default (= name) and the
-  # real tool names (opusenc/opusdec/opusinfo) are the aliases. The bare
-  # `opus-tools` dispatcher falls through to the flagship encoder, so
-  # `opus-tools --version` prints opusenc's banner (matching smokePattern). All
+  # real tool names (opusenc/opusdec/opusinfo) are the aliases. All
   # three upstream man pages ship, matching nixpkgs' opus-tools man output, so no
   # winManRoot curation is needed.
   outputs = { self, unpins-lib }:
@@ -37,7 +35,7 @@
     ulib.mkStandaloneFlake {
       inherit self;
       name = "opus-tools";
-      smoke = [ "--version" ];
+      smoke = [ "--unpin-program=opusenc" "--version" ];
       smokePattern = "opusenc.*opus-tools";
 
       # Build via the unpin-llvm engine + emit a bitcode multicall module: the
@@ -46,11 +44,9 @@
       # alike. Windows (mingw, no engine → native objects) goes through
       # windowsBuild's objcopy fold instead — objcopy cannot rewrite bitcode, so
       # ./multicall.nix must NOT run over an engine build. Pure C — no
-      # requires.cxx. The bare `opus-tools --version` smoke falls through to
-      # opusenc, so defaultProgram pins it.
+      # requires.cxx.
       engine = "unpin-llvm";
       multicall = {
-        defaultProgram = "opusenc";
         programs = [
           { name = "opusenc"; }
           { name = "opusdec"; }

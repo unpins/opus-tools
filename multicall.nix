@@ -174,9 +174,9 @@ let
       done
 
       # Dispatcher (shared canonical generator — see nix-lib
-      # lib.multicallTableDispatcherC). Applet list from multicall/apps.list ($TOOLS);
-      # a bare/unknown invocation runs opusenc (defaultApplet) so the
-      # `--version` smoke reaches opusenc_main and a renamed copy still dispatches.
+      # lib.multicallTableDispatcherC). Applet list from multicall/apps.list
+      # ($TOOLS). `opus-tools` is not one of the programs, so a bare/unknown
+      # invocation lists them; the smoke selects one with --unpin-program=.
       mkdir -p multicall
       printf '%s\n' $TOOLS > multicall/apps.list
       # The generator reads a TSV `<applet>\t<fn-base>` and calls `<fn-base>_main`;
@@ -188,7 +188,7 @@ let
       # `windows`: opusenc/opusdec/opusinfo all open with
       # init_commandline_arguments_utf8(), which rebuilds argv from the real
       # command line — without the rewrite they re-read the selector.
-${lib.multicallTableDispatcherC { name = "opus-tools"; defaultApplet = "opusenc"; windows = isWindows; }}
+${lib.multicallTableDispatcherC { name = "opus-tools"; windows = isWindows; }}
       $CC -O2 -c -o multicall/dispatcher.o multicall/dispatcher.c
 
       # Final link: shared archives, once. On GNU-ld targets wrap them in a group
