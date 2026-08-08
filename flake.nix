@@ -9,14 +9,9 @@
   inputs.unpins-lib.url = "github:unpins/nix-lib";
 
   # opus-tools installs three CLIs — `opusenc` (encode WAV/FLAC/AIFF → Opus),
-  # `opusdec` (decode/play Opus) and `opusinfo` (inspect Opus streams);
-  # ./multicall.nix post-links them into one `opus-tools` dispatcher binary with
-  # `opusenc`/`opusdec`/`opusinfo` as argv[0]-dispatch UNPIN_META aliases. Unlike
-  # the CMake suites (flac/libwebp), opus-tools is autotools and its three
-  # programs share most of their objects (opus_header / diag_range / picture /
-  # unicode_support), so the per-tool link command is captured from a verbose
-  # relink (the autotools analog of CMake's link.txt) and only the colliding
-  # `main`s are renamed.
+  # `opusdec` (decode/play Opus) and `opusinfo` (inspect Opus streams); nix-lib
+  # folds them into one `opus-tools` dispatcher binary with
+  # `opusenc`/`opusdec`/`opusinfo` as argv[0]-dispatch UNPIN_META aliases.
   #
   # Windows goes through mingw — the deps (libogg, libopus, FLAC, libopusenc,
   # opusfile) cross-compile cleanly and the runtime is folded static in the
@@ -31,6 +26,40 @@
   outputs = { self, unpins-lib }:
     let
       ulib = unpins-lib.lib;
+      # opus-tools' configure runs AC_CHECK_PROG(pkg-config) for the *unprefixed*
+      # name; under a static/cross stdenv the wrapper is host-prefixed, so
+      # HAVE_PKG_CONFIG=no and the FLAC probe falls back to a bare `-lFLAC` test
+      # that can't resolve libogg statically ("FLAC 1.1.3 required"). Force the
+      # flag so every PKG_CHECK_MODULES takes the pkg-config path. AC_CHECK_PROG
+      # is a no-op when the var is preset. The upstream version check runs a tool
+      # nix-lib refolds, so skip it.
+      opusFixes = drv: drv.overrideAttrs (o: {
+        preConfigure = (o.preConfigure or "") + ''
+          export HAVE_PKG_CONFIG=yes
+        '';
+        doCheck = false;
+        doInstallCheck = false;
+      });
+      # Two buildInputs fix-ups on the mingw cross, both about meta.platforms:
+      #   * Drop libao — nixpkgs still lists it, but opus-tools 0.2 dropped it
+      #     (no AO reference left in Makefile.am/configure.ac; opusdec plays via
+      #     sndio/OSS), so it never links, and libao is meta.platforms = unix.
+      #   * Lift the meta.platforms = unix guard on the xiph codec libs
+      #     (libopusenc, opusfile). They are portable C and cross-compile to
+      #     mingw cleanly; the restriction is over-conservative upstream
+      #     metadata. Overriding meta doesn't change the store path, only the
+      #     eval guard.
+      winInputs = pkgs: drv: drv.overrideAttrs (old: {
+        buildInputs =
+          let
+            metaAllow = d: d.overrideAttrs (o: {
+              meta = (o.meta or { }) // { platforms = pkgs.lib.platforms.all; broken = false; };
+            });
+            xiph = [ "libopusenc" "opusfile" ];
+          in
+          builtins.map (d: if builtins.elem (d.pname or "") xiph then metaAllow d else d)
+            (builtins.filter (d: (d.pname or "") != "libao") (old.buildInputs or [ ]));
+      });
     in
     ulib.mkStandaloneFlake {
       inherit self;
@@ -40,13 +69,11 @@
 
       # Build via the unpin-llvm engine + emit a bitcode multicall module: the
       # engine compiles opus-tools to bitcode and the standalone self-folds
-      # opusenc/opusdec/opusinfo into one `opus-tools` binary, on Linux and darwin
-      # alike. Windows (mingw, no engine → native objects) goes through
-      # windowsBuild's objcopy fold instead — objcopy cannot rewrite bitcode, so
-      # ./multicall.nix must NOT run over an engine build. Pure C — no
-      # requires.cxx.
+      # opusenc/opusdec/opusinfo into one `opus-tools` binary on every target,
+      # windows included. Pure C — no requires.cxx.
       engine = "unpin-llvm";
       multicall = {
+        windows = true;
         programs = [
           { name = "opusenc"; }
           { name = "opusdec"; }
@@ -73,22 +100,9 @@
             opusfile = ps.opusfile.override { libopus = fixedOpus; };
           };
         in
-        # engine path: apps → bitcode → selfFold. opus-tools' configure runs
-        # AC_CHECK_PROG(pkg-config) for the *unprefixed* name; under the static
-        # stdenv the wrapper is host-prefixed, so HAVE_PKG_CONFIG=no and the FLAC
-        # probe falls back to a bare `-lFLAC` test that can't resolve libogg
-        # statically ("FLAC 1.1.3 required"). Force the flag so every
-        # PKG_CHECK_MODULES takes the pkg-config path. (multicall.nix does the
-        # same on the windows fold path.)
-        opusTools.overrideAttrs (o: {
-          preConfigure = (o.preConfigure or "") + ''
-            export HAVE_PKG_CONFIG=yes
-          '';
-          doCheck = false;
-          doInstallCheck = false;
-        });
+        # engine path: apps → bitcode → selfFold.
+        opusFixes opusTools;
       windowsBuild = pkgs:
-        import ./multicall.nix { lib = pkgs.lib // ulib; }
-          { inherit pkgs; opusTools = (ulib.mingwStaticCross pkgs).opus-tools; };
+        opusFixes (winInputs pkgs (ulib.mingwStaticCross pkgs).opus-tools);
     };
 }
