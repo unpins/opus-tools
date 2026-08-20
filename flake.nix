@@ -103,6 +103,17 @@
         # engine path: apps → bitcode → selfFold.
         opusFixes opusTools;
       windowsBuild = pkgs:
-        opusFixes (winInputs pkgs (ulib.mingwStaticCross pkgs).opus-tools);
+        let
+          # OPENSSLDIR/ENGINESDIR/MODULESDIR default to openssl's own $out, so
+          # the .exe carried live references to `openssl-…-w64-mingw32` and its
+          # `-etc`. The retarget is set-wide ONLY in the engine's native scope
+          # (nix-lib/native-overlay/openssl.nix) -- the mingw and cosmo scopes
+          # have none, so each consumer has to do it. C:/ssl is what the
+          # standalone `openssl` package already uses for its own mingw build.
+          mingw = (ulib.mingwStaticCross pkgs).extend (final: prev: {
+            openssl = prev.openssl.overrideAttrs (ulib.retargetOpenssl "C:/ssl");
+          });
+        in
+        opusFixes (winInputs pkgs mingw.opus-tools);
     };
 }
