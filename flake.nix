@@ -31,24 +31,62 @@
       # HAVE_PKG_CONFIG=no and the FLAC probe falls back to a bare `-lFLAC` test
       # that can't resolve libogg statically ("FLAC 1.1.3 required"). Force the
       # flag so every PKG_CHECK_MODULES takes the pkg-config path. AC_CHECK_PROG
-      # is a no-op when the var is preset. The upstream version check runs a tool
-      # nix-lib refolds, so skip it.
-      opusFixes = drv: drv.overrideAttrs (o: {
+      # is a no-op when the var is preset.
+      #
+      # libao is dropped on every target: nixpkgs still lists it, but opus-tools
+      # 0.2 has no AO reference left in Makefile.am/configure.ac (opusdec plays
+      # through OSS on Linux and waveOut on Windows), so it never linked — it was
+      # only built, for nothing.
+      #
+      # nixpkgs' installCheck is a versionCheckHook on `opusenc`; it is replaced
+      # by a real round trip, run wherever the build host can execute the result
+      # (native, i686-from-x86_64, darwin — not the crosses, not mingw):
+      #   - raw PCM -> opusenc -> opusinfo must report 2 channels and exactly 1 s;
+      #   - opusdec must give back all 192000 bytes, as raw and as WAV;
+      #   - the same encode and decode through stdin/stdout ('-') must be
+      #     byte-identical to the file ones (--serial pins the Ogg serial number
+      #     opusenc otherwise randomizes) — the path a Windows CRT left in text
+      #     mode corrupts and no file argument covers.
+      # The probe is `seq` digits cut to size, read from a file so no producer
+      # dies of SIGPIPE under pipefail.
+      noAo = builtins.filter (d: (d.pname or "") != "libao");
+      opusFixes = scope: drv: drv.overrideAttrs (o: {
         preConfigure = (o.preConfigure or "") + ''
           export HAVE_PKG_CONFIG=yes
         '';
+        # pkgsStatic promotes buildInputs into propagatedBuildInputs, so both.
+        buildInputs = noAo (o.buildInputs or [ ]);
+        propagatedBuildInputs = noAo (o.propagatedBuildInputs or [ ]);
         doCheck = false;
-        doInstallCheck = false;
+        doInstallCheck = scope.stdenv.buildPlatform.canExecute scope.stdenv.hostPlatform;
+        nativeInstallCheckInputs = [ ];
+        installCheckPhase = ''
+          runHook preInstallCheck
+          _b="''${bin:-$out}/bin"
+          seq 1 34000 > digits
+          head -c 192000 digits > p.raw
+          "$_b/opusenc" --quiet --serial 1 --raw p.raw p.opus
+          "$_b/opusenc" --quiet --serial 1 --raw - - < p.raw > s.opus
+          cmp s.opus p.opus || {
+            echo "opusenc writes a different stream through stdin/stdout"; exit 1; }
+          "$_b/opusinfo" p.opus > info.txt
+          grep -q 'Channels: 2' info.txt && grep -q 'Playback length: 0m:01.000s' info.txt || {
+            cat info.txt; echo "opusinfo did not report the probe stream"; exit 1; }
+          "$_b/opusdec" --quiet p.opus back.raw
+          test "$(wc -c < back.raw)" -eq 192000 || {
+            echo "opusdec did not decode the whole stream"; exit 1; }
+          "$_b/opusdec" --quiet p.opus back.wav
+          "$_b/opusdec" --quiet --force-wav - - < p.opus > s.wav
+          cmp s.wav back.wav || {
+            echo "opusdec reads stdin or writes stdout differently"; exit 1; }
+          echo "installCheck: opusenc/opusinfo/opusdec round trip, files and stdin/stdout"
+          runHook postInstallCheck
+        '';
       });
-      # Two buildInputs fix-ups on the mingw cross, both about meta.platforms:
-      #   * Drop libao — nixpkgs still lists it, but opus-tools 0.2 dropped it
-      #     (no AO reference left in Makefile.am/configure.ac; opusdec plays via
-      #     sndio/OSS), so it never links, and libao is meta.platforms = unix.
-      #   * Lift the meta.platforms = unix guard on the xiph codec libs
-      #     (libopusenc, opusfile). They are portable C and cross-compile to
-      #     mingw cleanly; the restriction is over-conservative upstream
-      #     metadata. Overriding meta doesn't change the store path, only the
-      #     eval guard.
+      # Lift the meta.platforms = unix guard on the xiph codec libs (libopusenc,
+      # opusfile) for the mingw cross. They are portable C and cross-compile to
+      # mingw cleanly; the restriction is over-conservative upstream metadata.
+      # Overriding meta doesn't change the store path, only the eval guard.
       winInputs = pkgs: drv: drv.overrideAttrs (old: {
         buildInputs =
           let
@@ -58,7 +96,7 @@
             xiph = [ "libopusenc" "opusfile" ];
           in
           builtins.map (d: if builtins.elem (d.pname or "") xiph then metaAllow d else d)
-            (builtins.filter (d: (d.pname or "") != "libao") (old.buildInputs or [ ]));
+            (old.buildInputs or [ ]);
       });
     in
     ulib.mkStandaloneFlake {
@@ -66,6 +104,8 @@
       name = "opus-tools";
       smoke = [ "--unpin-program=opusenc" "--version" ];
       smokePattern = "opusenc.*opus-tools";
+      # opusdec opens http(s):// URLs, so it resolves hostnames.
+      dnsFallback = true;
 
       # Build via the unpin-llvm engine + emit a bitcode multicall module: the
       # engine compiles opus-tools to bitcode and the standalone self-folds
@@ -101,7 +141,7 @@
           };
         in
         # engine path: apps → bitcode → selfFold.
-        opusFixes opusTools;
+        opusFixes ps opusTools;
       windowsBuild = pkgs:
         let
           # OPENSSLDIR/ENGINESDIR/MODULESDIR default to openssl's own $out, so
@@ -110,10 +150,14 @@
           # (nix-lib/native-overlay/openssl.nix) -- the mingw and cosmo scopes
           # have none, so each consumer has to do it. C:/ssl is what the
           # standalone `openssl` package already uses for its own mingw build.
-          mingw = (ulib.mingwStaticCross pkgs).extend (final: prev: {
-            openssl = prev.openssl.overrideAttrs (ulib.retargetOpenssl "C:/ssl");
-          });
+          # Gated on the host: an overlay passed to `.extend` reaches the build
+          # platform's package set too, and ungated it rebuilt the native openssl
+          # (and everything above it, curl and git included) for nothing.
+          mingw = (ulib.mingwStaticCross pkgs).extend (final: prev:
+            prev.lib.optionalAttrs prev.stdenv.hostPlatform.isWindows {
+              openssl = prev.openssl.overrideAttrs (ulib.retargetOpenssl "C:/ssl");
+            });
         in
-        opusFixes (winInputs pkgs mingw.opus-tools);
+        opusFixes mingw (winInputs pkgs mingw.opus-tools);
     };
 }

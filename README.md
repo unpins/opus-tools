@@ -14,14 +14,15 @@ Part of the [unpins](https://unpins.org) catalog; install it with [`unpin`](http
 Run a program with [unpin](https://github.com/unpins/unpin):
 
 ```bash
-unpin opus-tools opusenc song.wav song.opus
-unpin opus-tools opusdec song.opus song.wav
+unpin opus-tools --unpin-program=opusenc song.wav song.opus
+unpin opus-tools --unpin-program=opusdec song.opus song.wav
 ```
 
-To install the programs onto your PATH:
+Or install them and call each by name, which is usually what you want:
 
 ```bash
 unpin install opus-tools
+opusenc song.wav song.opus
 ```
 
 `unpin install opus-tools` creates the `opusenc`, `opusdec`, and `opusinfo` commands.
@@ -31,23 +32,28 @@ unpin install opus-tools
 | command    | what it does                                          |
 | ---------- | ----------------------------------------------------- |
 | `opusenc`  | encode WAV / FLAC / AIFF / raw PCM to Opus            |
-| `opusdec`  | decode (or play) Opus back to WAV / raw PCM           |
+| `opusdec`  | decode Opus back to WAV / raw PCM                     |
 | `opusinfo` | show stream, header and tag info for an Opus file     |
 
 `opusenc` reads FLAC and Ogg FLAC input, and `opusdec` can decode Opus from a
 local file or an `http(s)://` URL.
 
+## Man pages
+
+All three upstream man pages are embedded in the binary — read them with
+`unpin man opus-tools <program>`, e.g. `unpin man opus-tools opusenc`.
+
 ## Build locally
 
 ```bash
 nix build github:unpins/opus-tools
-./result/bin/opusenc --version
+./result/bin/opus-tools --unpin-program=opusenc --version
 ```
 
 Or run directly:
 
 ```bash
-nix run github:unpins/opus-tools -- --version
+nix run github:unpins/opus-tools -- --unpin-program=opusenc --version
 ```
 
 The first invocation will offer to add the [unpins.cachix.org](https://unpins.cachix.org) substituter so most pulls come pre-built.
@@ -58,16 +64,14 @@ The [Releases](https://github.com/unpins/opus-tools/releases) page has standalon
 
 ## Build notes
 
-- One multicall binary holds all three tools. `opus-tools` is the canonical name
-  (a busybox-style dispatcher); `opusenc`, `opusdec` and `opusinfo` dispatch on
-  `argv[0]`. The tools share the heavy static archives — libopusenc / libopus /
-  libFLAC / libogg, plus opusfile + opusurl (URL decode) — linked once, so the
-  binary carries a single copy of each codec library.
-- The tools are folded together post-link by renaming each tool's `main` →
-  `<tool>_main` (and prefixing its other globals) with `objcopy`, then linking
-  the renamed objects against the shared archives; the archive list is read from
-  each tool's real link command, captured with a verbose relink.
-- **Windows** is built with mingw; the runtime is folded static in the multicall
-  link, so the `.exe` has no companion DLLs.
-- All three upstream man pages (`opusenc.1`, `opusdec.1`, `opusinfo.1`) are
-  embedded in the binary.
+- One binary at `bin/opus-tools` carries all three programs. `unpin install
+  opus-tools` puts `opusenc`, `opusdec` and `opusinfo` on your PATH; from the
+  bare binary, pick one with `--unpin-program=<program>`. It is not a
+  positional argument.
+- **HTTPS:** `opusdec https://…` checks the server against the host's CA
+  certificates, or against Mozilla's root certificates built into the binary
+  when the host has none (a minimal container, for example). On Windows the
+  built-in roots are combined with the system's trusted root store.
+- Every build encodes, inspects and decodes a real stream before it is
+  accepted, through files and through standard input/output alike.
+- **Windows:** a single `.exe` with no companion DLLs.
