@@ -10,7 +10,9 @@
   certificates wherever the common systems keep them, and falls back to
   Mozilla's root certificates built into the binary on a host that has none.
   On Windows the built-in roots are combined with the system's trusted root
-  store. `SSL_CERT_FILE` and `SSL_CERT_DIR` still take precedence.
+  store, leaving out certificates Windows marks as untrusted, and nothing
+  under `C:\ssl` is trusted. `SSL_CERT_FILE` and `SSL_CERT_DIR` still take
+  precedence.
 
 ### Added
 
