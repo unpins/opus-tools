@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2-2] - 2026-09-26
+
 ### Fixed
 
 - `opusdec https://…` failed certificate verification on Fedora, RHEL,
