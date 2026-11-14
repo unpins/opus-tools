@@ -75,3 +75,7 @@ The [Releases](https://github.com/unpins/opus-tools/releases) page has standalon
 - Every build encodes, inspects and decodes a real stream before it is
   accepted, through files and through standard input/output alike.
 - **Windows:** built with mingw-w64.
+- **Playback:** `opusdec` without an output file plays the stream through
+  `/dev/dsp` (OSS) on Linux and waveOut on Windows. The macOS build has no
+  audio output (`No soundcard support`): give it an output file, or `-` for
+  standard output. The sndio backend is not included, as in nixpkgs.
