@@ -74,4 +74,4 @@ The [Releases](https://github.com/unpins/opus-tools/releases) page has standalon
   built-in roots are combined with the system's trusted root store.
 - Every build encodes, inspects and decodes a real stream before it is
   accepted, through files and through standard input/output alike.
-- **Windows:** a single `.exe` with no companion DLLs.
+- **Windows:** built with mingw-w64.
