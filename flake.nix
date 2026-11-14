@@ -57,6 +57,8 @@
         # pkgsStatic promotes buildInputs into propagatedBuildInputs, so both.
         buildInputs = noAo (o.buildInputs or [ ]);
         propagatedBuildInputs = noAo (o.propagatedBuildInputs or [ ]);
+        # No upstream suite (`#TESTS = FIXME` in Makefile.am); the installCheck
+        # below is the test.
         doCheck = false;
         doInstallCheck = scope.stdenv.buildPlatform.canExecute scope.stdenv.hostPlatform;
         nativeInstallCheckInputs = [ ];
@@ -82,21 +84,6 @@
           echo "installCheck: opusenc/opusinfo/opusdec round trip, files and stdin/stdout"
           runHook postInstallCheck
         '';
-      });
-      # Lift the meta.platforms = unix guard on the xiph codec libs (libopusenc,
-      # opusfile) for the mingw cross. They are portable C and cross-compile to
-      # mingw cleanly; the restriction is over-conservative upstream metadata.
-      # Overriding meta doesn't change the store path, only the eval guard.
-      winInputs = pkgs: drv: drv.overrideAttrs (old: {
-        buildInputs =
-          let
-            metaAllow = d: d.overrideAttrs (o: {
-              meta = (o.meta or { }) // { platforms = pkgs.lib.platforms.all; broken = false; };
-            });
-            xiph = [ "libopusenc" "opusfile" ];
-          in
-          builtins.map (d: if builtins.elem (d.pname or "") xiph then metaAllow d else d)
-            (old.buildInputs or [ ]);
       });
     in
     ulib.mkStandaloneFlake {
@@ -158,6 +145,6 @@
               openssl = prev.openssl.overrideAttrs (ulib.retargetOpenssl "C:/ssl");
             });
         in
-        opusFixes mingw (winInputs pkgs mingw.opus-tools);
+        opusFixes mingw mingw.opus-tools;
     };
 }
